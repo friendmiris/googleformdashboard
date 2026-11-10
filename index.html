@@ -42,6 +42,18 @@ header{border-bottom:1px solid #e7edf5;position:sticky;top:0;z-index:5;backgroun
 .reasonTags b{white-space:nowrap;color:#315be8}
 @media(max-width:750px){.caseColumns,.reasonTags{grid-template-columns:1fr}.caseUnified{padding:16px}}
 @media print{.caseColumns{grid-template-columns:repeat(2,minmax(0,1fr))}.hideQuestion{display:none!important}}
+/* Visual integration: outreach rankings are part of the outreach-type card */
+.outreachEmbedded{border-top:1px solid #e0e8f3;margin-top:24px;padding-top:17px}
+.outreachHeading{font-size:17px;font-weight:850;color:#263e62;margin:0 0 12px}
+.outreachEmbedded .caseColumns{margin-top:0;gap:14px}
+.outreachEmbedded .caseColumn{background:#f9fbff}
+.departmentPanel{grid-column:1/-1}
+.departmentPanel .barRows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:30px;row-gap:11px}
+.departmentPanel .barRow{padding-bottom:6px;border-bottom:1px solid #eef2f7}
+.departmentPanel .barName{font-size:14px;line-height:1.45}
+.departmentPanel .barInfo b{font-size:13px}
+@media(max-width:750px){.outreachEmbedded .caseColumns,.departmentPanel .barRows{grid-template-columns:1fr}}
+@media print{.departmentPanel .barRows{grid-template-columns:repeat(2,minmax(0,1fr))}.outreachEmbedded .caseColumns{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head><body>
 <div class="login" id="login"><div class="loginbox"><h2>센터 현황판 로그인</h2><p>관리자 비밀번호를 입력하면 현황판을 확인할 수 있습니다.</p><form id="loginForm" autocomplete="off"><input id="password" type="password" placeholder="비밀번호" autocomplete="new-password" required><label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" id="showPassword"> 비밀번호 표시</label><button class="primary" type="submit" style="margin-top:13px">현황판 열기</button><p class="err" id="error"></p></form></div></div>
 <header><div class="wrap"><div class="logo"><i>C</i>센터 현황 분석</div><button class="smallbtn" id="printBtn">인쇄 / PDF</button></div></header>
@@ -102,10 +114,9 @@ function card(i,group){const stat=group.stats[i];const id='q'+i;if(isHidden(id))
  const itemlist=allRows(i,stat),total=stat.answered;
  if(!total)return '<article class="panel">'+heading(stat.name,id)+'<div class="empty">응답 없음</div></article>';
  // 복음방 횟수는 모든 실제 선택지를 그대로 표시: '기타'라는 가짜 선택지 생성하지 않음
- const visible=(i===5||i===6||i===10||i===11||i===14)?itemlist:itemlist.slice(0,9);
- const remaining=itemlist.slice(visible.length).reduce((sum,x)=>sum+x[1],0);
- const chartItems=remaining?[...visible,["추가 "+(itemlist.length-visible.length)+"개 항목",remaining]]:visible;
- const isBar=graphMode==='bar';
+ // 모든 항목을 빠짐없이 표시. 부서는 항목이 많아서 항상 가로 막대그래프로 표시한다.
+ const chartItems=itemlist;
+ const isBar=graphMode==='bar'||i===1;
  let chartBody='';
  if(isBar){chartBody=bars(chartItems,total)}
  else{
@@ -116,15 +127,16 @@ function card(i,group){const stat=group.stats[i];const id='q'+i;if(isHidden(id))
   const legend=chartItems.map(([v,n],idx)=>'<div class="legendrow"><span class="dot" style="background:'+colors[idx%colors.length]+'"></span><span class="legendText">'+clean(v)+'</span><strong>'+n+'건 <small>'+(n/total*100).toFixed(0)+'%</small></strong></div>').join('');
   chartBody='<div class="chartContent">'+donut+'<div class="legend">'+legend+'</div></div>';
  }
- return '<article class="panel" data-item="'+id+'">'+heading(stat.name,id)+chartBody+(i===11&&activeMode==='rejected'?otherReasonsHtml(group):'')+'</article>'
+ return '<article class="panel '+(i===1?'departmentPanel':'')+'" data-item="'+id+'">'+heading(stat.name,id)+chartBody+(i===6?caseCombinedCard(group):'')+(i===11&&activeMode==='rejected'?otherReasonsHtml(group):'')+'</article>'
 }
 function caseCombinedCard(group){
- const id='caseCombined';if(isHidden(id))return '';
+ // 섭외유형 카드 내부에 TOP3 통합. 탭별 통계가 그대로 반영된다.
  function column(index,name){
-  const list=(group.categories[String(index)]||[]).slice(0,3);const max=Math.max(1,...list.map(v=>v.count));
-  return '<div class="caseColumn"><h4>'+name+'</h4>'+(list.map((v,i)=>'<div class="caseRowBlock"><div class="caseSummary"><span class="caseRank">'+(i+1)+'위</span><b class="caseTitle">'+clean(v.label)+'</b><strong class="caseCount">'+v.count+'건</strong></div><div class="caseBar"><i style="width:'+(v.count/max*100)+'%;background:'+colors[i%colors.length]+'"></i></div></div>').join('')||'<div class="empty">응답 없음</div>')+'</div>';
+  const list=(group.categories[String(index)]||[]).slice(0,3);
+  const max=Math.max(1,...list.map(v=>v.count));
+  return '<div class="caseColumn"><h4>'+name+'</h4>'+(list.map((v,i)=>'<div class="caseRowBlock"><div class="caseSummary"><span class="caseRank">'+(i+1)+'위</span><b class="caseTitle">'+clean(v.label)+'</b><strong class="caseCount">'+number(v.count)+'건</strong></div><div class="caseBar"><i style="width:'+(v.count/max*100)+'%;background:'+colors[i%colors.length]+'"></i></div></div>').join('')||'<div class="empty">응답 없음</div>')+'</div>';
  }
- return '<article class="caseCard caseUnified" data-item="'+id+'">'+heading('온라인·오프라인 개척 사례 TOP 3',id)+'<div class="caseColumns">'+column(7,'온라인 개척')+column(8,'오프라인 개척')+'</div></article>';
+ return '<div class="outreachEmbedded"><h4 class="outreachHeading">개척 사례 TOP 3</h4><div class="caseColumns">'+column(7,'온라인 개척')+column(8,'오프라인 개척')+'</div></div>';
 }
 function otherReasonCategory(text){const v=String(text??'').toLowerCase().replace(/\s+/g,'');if(/거짓말|속임|사실과다름/.test(v))return '사실관계·신뢰 문제';if(/공황|약복용|우울|건강/.test(v))return '건강·복약 관련';if(/범죄|인성결격|결격사항/.test(v))return '적격성 관련';if(/이성교제|관계/.test(v))return '개인 관계 사유';return '기타 사유'}
 function otherReasonsHtml(group){
@@ -148,7 +160,7 @@ function render(){if(!data)return;
  const common=[0,1,2,9,10,15];
  const detail=activeMode==='all'?[3,4,5,6]:[3,4,5,6,9,10,14,15];
  const ordered=activeMode==='all'?[...common,...detail]:detail;
- let html='';for(const i of ordered){html+=card(i,d);if(i===6){html+=caseCombinedCard(d)}}
+ let html='';for(const i of ordered){html+=card(i,d)}
  $('primary').innerHTML=html;
  $('outcomeSection').classList.toggle('hide',activeMode==='all');
  $('outcomeHeading').classList.toggle('hide',activeMode==='registered');if(activeMode==='rejected'){$('outcomeTitle').textContent='탈락 원인 순위';$('outcome').innerHTML=card(11,d)}
